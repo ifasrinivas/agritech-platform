@@ -13,6 +13,7 @@ import GlassCard from "@/components/screens/agritech/premium/GlassCard";
 import MetricPill from "@/components/screens/agritech/premium/MetricPill";
 import ActionGrid from "@/components/screens/agritech/premium/ActionGrid";
 import SectionHeader from "@/components/screens/agritech/premium/SectionHeader";
+import { CropHealthCard, WeatherAdvisoryCard, IdealValuesCard, FarmerAction } from "@/components/screens/agritech/premium/FarmerCards";
 import { COLORS, SHADOWS, GRADIENTS } from "@/components/screens/agritech/premium/theme";
 import {
   Satellite, ShoppingCart, CloudSun, ClipboardList, BarChart3, FileText,
@@ -187,6 +188,38 @@ export default function DashboardScreen() {
             </GlassCard>
           </View>
         )}
+
+        {/* Farmer-Friendly Weather Advisory */}
+        {weatherInsights && weather && (
+          <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+            <SectionHeader title="Today's Advisory" />
+            <WeatherAdvisoryCard
+              temperature={weather.current?.temperature ?? 30}
+              humidity={weather.current?.humidity ?? 50}
+              sprayOk={weatherInsights.sprayWindow.suitable}
+              sprayReason={weatherInsights.sprayWindow.reason}
+              diseaseRisk={weatherInsights.diseaseRisk.level}
+              diseases={weatherInsights.diseaseRisk.diseases}
+              irrigationAdvice={weatherInsights.irrigationAdvice.action.includes("Skip") ? "skip" : weatherInsights.irrigationAdvice.action.includes("Increase") ? "increase" : "normal"}
+              rainNext3d={0}
+            />
+          </View>
+        )}
+
+        {/* Ideal Values Quick Reference */}
+        <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+          <IdealValuesCard
+            title="Ideal Values for Your Crops"
+            values={[
+              { parameter: "Soil pH", icon: "\ud83e\uddea", ideal: "6.0 - 7.5", current: "7.2", status: "good" },
+              { parameter: "Soil Moisture", icon: "\ud83d\udca7", ideal: "25-45%", current: "20%", status: "warn" },
+              { parameter: "NDVI Health", icon: "\ud83c\udf31", ideal: "> 0.6", current: avgNDVI.toFixed(2), status: avgNDVI > 0.6 ? "good" : avgNDVI > 0.4 ? "warn" : "bad" },
+              { parameter: "Temperature", icon: "\ud83c\udf21\ufe0f", ideal: "20-35°C", current: `${liveTemp ?? "--"}°C`, status: (liveTemp ?? 30) > 35 ? "bad" : (liveTemp ?? 30) < 15 ? "bad" : "good" },
+              { parameter: "Organic Carbon", icon: "\ud83c\udf3f", ideal: "> 0.5%", current: "0.65%", status: "good" },
+              { parameter: "Wind (Spray)", icon: "\ud83d\udca8", ideal: "< 12 km/h", current: `${weather?.current?.windSpeed ?? "--"} km/h`, status: (weather?.current?.windSpeed ?? 10) < 12 ? "good" : "bad" },
+            ]}
+          />
+        </View>
 
         {/* NDVI Map */}
         <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
