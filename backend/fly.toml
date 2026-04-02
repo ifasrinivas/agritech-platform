@@ -1,0 +1,27 @@
+app = "agritech-api"
+primary_region = "sin"  # Singapore (closest to India)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DATABASE_URL = "sqlite+aiosqlite:///data/agritech.db"
+  JWT_SECRET_KEY = "ab469c21d204ee129b5a42977277dc6896ad241f56bc2a3961044a6273521a8b"
+  CORS_ORIGINS = '["*"]'
+  DEBUG = "false"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[mounts]
+  source = "agritech_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
