@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import health_check, auth, farmers, farms, fields, ndvi, irrigation, admin, sentinel, weather
+from app.api import health_check, auth, farmers, farms, fields, ndvi, irrigation, admin, sentinel, weather, quick_setup
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -13,6 +13,7 @@ api_router.include_router(irrigation.router)
 api_router.include_router(admin.router)
 api_router.include_router(sentinel.router)
 api_router.include_router(weather.router)
+api_router.include_router(quick_setup.router)
 
 # Health check at root level (no /api/v1 prefix)
 root_router = APIRouter()

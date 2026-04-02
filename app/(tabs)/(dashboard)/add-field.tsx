@@ -10,6 +10,7 @@ import MapView, { Marker, Polygon, PROVIDER_GOOGLE, HAS_MAPS } from "@/component
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
 import { LinearGradient } from "expo-linear-gradient";
 import { backendClient } from "@/services/backend-client";
+import { BACKEND_URL } from "@/services/api-config";
 import { COLORS, SHADOWS, RADIUS, GRADIENTS } from "@/components/screens/agritech/premium/theme";
 import {
   X, ChevronLeft, ChevronRight, MapPin, Undo2, Trash2,
@@ -345,32 +346,70 @@ export default function AddFieldScreen() {
 
                   (async () => {
                     try {
-                      const fieldData = {
-                        farm_id: "00000000-0000-0000-0000-000000000010",
-                        name: form.name || "New Field",
-                        crop: form.crop || "Unknown",
-                        area: parseFloat(finalArea.toFixed(2)),
-                        soil_type: form.soilType || undefined,
-                        irrigation_type: form.irrigationType || undefined,
-                        coordinates: boundaryPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
-                      };
-                      const created = await backendClient.createField(fieldData);
-                      let ndviResult = null;
-                      try { ndviResult = await backendClient.triggerNDVI(created.id); } catch {}
+                      // Use quick-add-field endpoint (creates farmer+farm+field+NDVI+soil in one call)
+                      const resp = await fetch(`${BACKEND_URL}/api/v1/quick-add-field`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          field_name: form.name || "New Field",
+                          crop: form.crop || "Unknown",
+                          area: parseFloat(finalArea.toFixed(2)),
+                          soil_type: form.soilType || undefined,
+                          irrigation_type: form.irrigationType || undefined,
+                          coordinates: boundaryPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+                          farmer_name: "App User",
+                          farm_name: form.name ? `${form.name} Farm` : "My Farm",
+                        }),
+                      });
 
+                      if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                        throw new Error(err.detail || `HTTP ${resp.status}`);
+                      }
+
+                      const result = await resp.json();
                       setSubmitting(false);
-                      Alert.alert(
-                        "Field Added!",
-                        `${created.name} (${created.area} acres) saved.` +
-                        `\n\nBoundary: ${boundaryPoints.length} GPS points stored.` +
-                        (ndviResult ? `\n\nNDVI: ${ndviResult.ndvi_mean.toFixed(3)} | Health: ${ndviResult.health_status} (${ndviResult.health_score}/100)` : ""),
-                        [{ text: "Done", onPress: () => router.back() }]
-                      );
+
+                      // Build result message
+                      let msg = `${result.field?.name || form.name} saved to server.\n`;
+                      msg += `Farmer: ${result.farmer_id?.slice(0, 8)}...\n`;
+                      msg += `Farm: ${result.farm_id?.slice(0, 8)}...\n`;
+                      msg += `Boundary: ${boundaryPoints.length} GPS points\n`;
+
+                      const ndvi = result.ndvi_analysis;
+                      if (ndvi && !ndvi.error) {
+                        msg += `\n--- Satellite NDVI ---`;
+                        msg += `\nNDVI: ${ndvi.ndvi_mean?.toFixed(4) || "?"}`;
+                        msg += `\nHealth: ${ndvi.health_status || "?"} (${ndvi.health_score || "?"}/100)`;
+                        msg += `\nSource: ${ndvi.source || "?"}`;
+                        if (ndvi.growth_stage) msg += `\nStage: ${ndvi.growth_stage}`;
+                      }
+
+                      const soil = result.soil_report;
+                      if (soil && !soil.error) {
+                        const p = soil.physical_properties || {};
+                        const c = soil.chemical_properties || {};
+                        msg += `\n\n--- Soil ---`;
+                        msg += `\nTexture: ${p.texture_class || "?"}`;
+                        msg += `\npH: ${c.pH || "?"} (${c.pH_status || "?"})`;
+                        if (soil.current_conditions?.soil_temperature) {
+                          msg += `\nTemp: ${soil.current_conditions.soil_temperature.surface_0cm}°C`;
+                        }
+                      }
+
+                      const sat = result.sentinel_scenes;
+                      if (sat?.count > 0) {
+                        msg += `\n\n--- Sentinel-2 ---`;
+                        msg += `\n${sat.count} passes | Latest: ${sat.scenes[0]?.date}`;
+                      }
+
+                      Alert.alert("Field Added!", msg, [{ text: "Done", onPress: () => router.back() }]);
+
                     } catch (err: any) {
                       setSubmitting(false);
                       Alert.alert(
-                        "Saved Locally",
-                        `${form.name || "New Field"} (${finalArea.toFixed(2)} acres) saved offline.\nBoundary: ${boundaryPoints.length} points.\n\n(${err.message || "Backend unavailable"})`,
+                        "Error",
+                        `${err.message || "Backend unavailable"}\n\nBackend: ${BACKEND_URL}`,
                         [{ text: "OK", onPress: () => router.back() }]
                       );
                     }
