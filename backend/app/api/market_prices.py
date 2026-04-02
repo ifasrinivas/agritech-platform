@@ -97,7 +97,7 @@ async def get_sell_recommendation(crop: str):
         raise HTTPException(404, f"No data for '{crop}'")
 
     rec = data["recommendation"]
-    icon = {"sell": "\ud83d\udfe2 SELL NOW", "hold": "\ud83d\udfe1 HOLD", "wait": "\ud83d\udd35 WAIT"}
+    icon = {"sell": "SELL NOW", "hold": "HOLD", "wait": "WAIT"}
     modal = data["varieties"][0]["modal"] if data["varieties"] else 0
 
     return {
