@@ -1,233 +1,258 @@
-import React from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { weatherData } from "@/data/agritech";
+import { backendClient } from "@/services/backend-client";
+import { COLORS, RADIUS, SHADOWS } from "@/components/screens/agritech/premium/theme";
+import { CloudSun, Search, MapPin, Droplets, Wind, Thermometer, ChevronLeft } from "lucide-react-native";
+import { weatherCodeToCondition } from "@/services/weather-service";
 
-const conditionIcons: Record<string, string> = {
-  Sunny: "\u2600\ufe0f",
-  "Partly Cloudy": "\u26c5",
-  Cloudy: "\u2601\ufe0f",
-  Rain: "\ud83c\udf27\ufe0f",
-  Thunderstorm: "\u26c8\ufe0f",
-};
+const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function WeatherDetailScreen() {
   const router = useRouter();
+  const [weather, setWeather] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [locationName, setLocationName] = useState("Nashik, Maharashtra");
+  const [coords, setCoords] = useState({ lat: 20.0063, lon: 73.7910 });
 
-  const hourlyData = [
-    { time: "6 AM", temp: 22, humidity: 78, icon: "\ud83c\udf24\ufe0f", wind: 8, dew: 18 },
-    { time: "8 AM", temp: 25, humidity: 72, icon: "\u26c5", wind: 10, dew: 19 },
-    { time: "10 AM", temp: 29, humidity: 65, icon: "\u26c5", wind: 11, dew: 20 },
-    { time: "12 PM", temp: 32, humidity: 58, icon: "\u2600\ufe0f", wind: 14, dew: 21 },
-    { time: "2 PM", temp: 34, humidity: 52, icon: "\u2600\ufe0f", wind: 16, dew: 20 },
-    { time: "4 PM", temp: 33, humidity: 55, icon: "\u26c5", wind: 13, dew: 21 },
-    { time: "6 PM", temp: 30, humidity: 62, icon: "\u26c5", wind: 10, dew: 20 },
-    { time: "8 PM", temp: 27, humidity: 70, icon: "\ud83c\udf19", wind: 7, dew: 19 },
-    { time: "10 PM", temp: 24, humidity: 76, icon: "\ud83c\udf19", wind: 5, dew: 18 },
-  ];
+  useEffect(() => {
+    fetchWeather(coords.lat, coords.lon);
+  }, [coords]);
+
+  async function fetchWeather(lat: number, lon: number) {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await backendClient.getWeatherForecast(lat, lon, 7);
+      setWeather(data);
+    } catch (e: any) {
+      setError(e.message || "Failed to fetch weather");
+    }
+    setLoading(false);
+  }
+
+  async function handleSearch() {
+    if (searchQuery.length < 2) return;
+    setSearching(true);
+    try {
+      const data = await backendClient.searchLocation(searchQuery);
+      setSearchResults(data.results || []);
+    } catch {
+      setSearchResults([]);
+    }
+    setSearching(false);
+  }
+
+  function selectLocation(result: any) {
+    setCoords({ lat: result.latitude, lon: result.longitude });
+    setLocationName(`${result.name}, ${result.admin1 || result.country}`);
+    setSearchResults([]);
+    setSearchQuery("");
+  }
+
+  const current = weather?.current;
+  const daily = weather?.daily;
+  const hourly = weather?.hourly;
+  const insights = weather?.agricultural_insights;
+  const condInfo = current ? weatherCodeToCondition(current.weather_code) : { condition: "Loading", icon: "\u26c5" };
 
   return (
-    <SafeAreaView className="flex-1 bg-background-0">
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.surface.raised }}>
       {/* Header */}
-      <View className="flex-row items-center px-5 pt-4 pb-3 border-b border-outline-100">
-        <Pressable onPress={() => router.back()} className="mr-3">
-          <Text className="text-typography-500 text-2xl">{"\u2190"}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.surface.base, borderBottomWidth: 1, borderBottomColor: COLORS.surface.borderLight }}>
+        <Pressable onPress={() => router.back()} style={{ padding: 4 }}>
+          <ChevronLeft size={22} color={COLORS.text.secondary} />
         </Pressable>
-        <View>
-          <Text className="text-typography-900 text-lg font-dm-sans-bold">
-            {"\ud83c\udf24\ufe0f"} Weather Intelligence
-          </Text>
-          <Text className="text-typography-400 text-xs">Agricultural weather advisory</Text>
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <CloudSun size={18} color={COLORS.accent.blue} />
+            <Text style={{ color: COLORS.text.primary, fontSize: 17, fontFamily: "dm-sans-bold" }}>Weather Intelligence</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+            <MapPin size={11} color={COLORS.text.muted} />
+            <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>{locationName}</Text>
+          </View>
         </View>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 30 }}>
-        {/* Current Conditions */}
-        <View className="mx-5 mt-4 bg-background-50 rounded-2xl p-5 border border-outline-100">
-          <View className="flex-row items-center justify-between">
-            <View>
-              <Text className="text-typography-400 text-xs">Nashik, Maharashtra</Text>
-              <Text className="text-typography-900 text-5xl font-dm-sans-bold mt-1">
-                {weatherData.temperature}{"\u00b0"}
-              </Text>
-              <Text className="text-typography-600 text-base font-dm-sans-medium">
-                {weatherData.condition}
-              </Text>
-              <Text className="text-typography-400 text-xs mt-1">
-                Feels like 35\u00b0C \u2022 UV Index: 7 (High)
-              </Text>
-            </View>
-            <Text style={{ fontSize: 64 }}>
-              {conditionIcons[weatherData.condition] || "\u2600\ufe0f"}
-            </Text>
-          </View>
-
-          <View className="flex-row mt-4 pt-4 border-t border-outline-100">
-            {[
-              { label: "Humidity", value: `${weatherData.humidity}%`, icon: "\ud83d\udca7" },
-              { label: "Wind", value: `${weatherData.windSpeed} km/h`, icon: "\ud83d\udca8" },
-              { label: "Pressure", value: "1013 hPa", icon: "\ud83c\udf21\ufe0f" },
-              { label: "Visibility", value: "8 km", icon: "\ud83d\udc41\ufe0f" },
-            ].map((item, i) => (
-              <View key={i} className="flex-1 items-center">
-                <Text style={{ fontSize: 16 }}>{item.icon}</Text>
-                <Text className="text-typography-400 text-xs mt-1">{item.label}</Text>
-                <Text className="text-typography-800 text-xs font-dm-sans-bold">{item.value}</Text>
-              </View>
-            ))}
-          </View>
+      {/* Location Search */}
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.surface.base }}>
+        <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface.overlay, borderRadius: RADIUS.md, paddingHorizontal: 12, borderWidth: 1, borderColor: COLORS.surface.border }}>
+          <Search size={16} color={COLORS.text.muted} />
+          <TextInput
+            style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 8, fontSize: 13, color: COLORS.text.primary }}
+            placeholder="Search city... (Nashik, Mumbai, Pune)"
+            placeholderTextColor={COLORS.text.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          {searching && <ActivityIndicator size="small" color={COLORS.primary.from} />}
         </View>
 
-        {/* Hourly Forecast */}
-        <View className="mt-4 px-5">
-          <Text className="text-typography-900 font-dm-sans-bold text-base mb-3">
-            Hourly Forecast
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View className="flex-row gap-2">
-              {hourlyData.map((hour, i) => (
-                <View key={i} className="bg-background-50 rounded-xl p-3 items-center border border-outline-100" style={{ width: 72 }}>
-                  <Text className="text-typography-500 text-xs">{hour.time}</Text>
-                  <Text style={{ fontSize: 20, marginVertical: 4 }}>{hour.icon}</Text>
-                  <Text className="text-typography-900 font-dm-sans-bold text-sm">{hour.temp}\u00b0</Text>
-                  <Text className="text-blue-500 text-xs">{hour.humidity}%</Text>
-                  <Text className="text-typography-400 text-xs">{hour.wind} km/h</Text>
+        {/* Search Results */}
+        {searchResults.length > 0 && (
+          <View style={{ backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, marginTop: 4, borderWidth: 1, borderColor: COLORS.surface.border, ...SHADOWS.md }}>
+            {searchResults.map((r, i) => (
+              <Pressable key={i} onPress={() => selectLocation(r)}>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: i < searchResults.length - 1 ? 1 : 0, borderBottomColor: COLORS.surface.borderLight }}>
+                  <MapPin size={14} color={COLORS.primary.from} />
+                  <View style={{ marginLeft: 8 }}>
+                    <Text style={{ color: COLORS.text.primary, fontSize: 13, fontFamily: "dm-sans-medium" }}>{r.name}</Text>
+                    <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>{r.admin1 || ""}, {r.country} ({r.latitude?.toFixed(2)}, {r.longitude?.toFixed(2)})</Text>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {loading ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={COLORS.primary.from} />
+          <Text style={{ color: COLORS.text.muted, marginTop: 10, fontSize: 13 }}>Loading weather data...</Text>
+        </View>
+      ) : error ? (
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <Text style={{ color: COLORS.status.critical, fontSize: 14 }}>{error}</Text>
+          <Pressable onPress={() => fetchWeather(coords.lat, coords.lon)} style={{ marginTop: 12, backgroundColor: COLORS.primary.from, borderRadius: RADIUS.md, paddingHorizontal: 20, paddingVertical: 10 }}>
+            <Text style={{ color: "#fff", fontFamily: "dm-sans-bold" }}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
+          {/* Current */}
+          <View style={{ margin: 16, backgroundColor: "#0c4a6e", borderRadius: RADIUS.xl, padding: 20, ...SHADOWS.lg }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View>
+                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                  <Text style={{ color: "#fff", fontSize: 52, fontFamily: "dm-sans-bold", letterSpacing: -2 }}>{Math.round(current?.temperature || 0)}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 22, marginTop: 8 }}>{"\u00b0"}C</Text>
+                </View>
+                <Text style={{ color: "rgba(255,255,255,0.85)", fontSize: 15, fontFamily: "dm-sans-medium" }}>{condInfo.condition}</Text>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 2 }}>
+                  Feels like {Math.round(current?.feels_like || 0)}{"\u00b0"} | UV: {current?.uv_index || 0}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 56 }}>{condInfo.icon}</Text>
+            </View>
+
+            <View style={{ flexDirection: "row", marginTop: 16, gap: 8 }}>
+              {[
+                { icon: <Droplets size={13} color="rgba(255,255,255,0.6)" />, label: "Humidity", value: `${current?.humidity || 0}%` },
+                { icon: <Wind size={13} color="rgba(255,255,255,0.6)" />, label: "Wind", value: `${Math.round(current?.wind_speed || 0)} km/h` },
+                { icon: <Thermometer size={13} color="rgba(255,255,255,0.6)" />, label: "Pressure", value: `${Math.round(current?.pressure || 0)} hPa` },
+              ].map((item, i) => (
+                <View key={i} style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, padding: 10, alignItems: "center" }}>
+                  {item.icon}
+                  <Text style={{ color: "#fff", fontSize: 13, fontFamily: "dm-sans-bold", marginTop: 4 }}>{item.value}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 9 }}>{item.label}</Text>
                 </View>
               ))}
             </View>
-          </ScrollView>
-        </View>
+          </View>
 
-        {/* 7-Day Forecast Extended */}
-        <View className="mt-4 px-5">
-          <Text className="text-typography-900 font-dm-sans-bold text-base mb-3">
-            7-Day Extended Forecast
-          </Text>
-          {weatherData.forecast.map((day, i) => (
-            <View
-              key={i}
-              className="flex-row items-center py-3 px-4 bg-background-50 rounded-xl mb-2 border border-outline-100"
-            >
-              <Text className="text-typography-700 font-dm-sans-medium text-sm w-12">{day.day}</Text>
-              <Text style={{ fontSize: 20, width: 32 }}>{conditionIcons[day.condition] || "\u2600\ufe0f"}</Text>
-              <View className="flex-1 mx-3">
-                <View className="h-2 bg-background-200 rounded-full overflow-hidden flex-row">
-                  <View style={{ flex: day.low - 15, backgroundColor: "transparent" }} />
-                  <View
-                    className="rounded-full"
-                    style={{
-                      flex: day.high - day.low,
-                      backgroundColor: day.rainChance > 50 ? "#3b82f6" : day.high > 32 ? "#ef4444" : "#f59e0b",
-                    }}
-                  />
-                  <View style={{ flex: 40 - day.high, backgroundColor: "transparent" }} />
+          {/* Agricultural Insights */}
+          {insights && (
+            <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontFamily: "dm-sans-bold", marginBottom: 10 }}>Agricultural Insights</Text>
+              {[
+                { label: "Spray Window", value: insights.spray_window.suitable ? "Suitable" : "Hold", detail: insights.spray_window.reason, color: insights.spray_window.suitable ? COLORS.status.excellent : COLORS.status.critical },
+                { label: "Disease Risk", value: insights.disease_risk.level.toUpperCase(), detail: insights.disease_risk.diseases.join(", ") || "No risk detected", color: insights.disease_risk.level === "high" ? COLORS.status.critical : insights.disease_risk.level === "medium" ? COLORS.status.moderate : COLORS.status.excellent },
+                { label: "Irrigation", value: insights.irrigation.advice, detail: `Rain 3d: ${insights.irrigation.rain_next_3d_mm}mm | ET0: ${insights.irrigation.et0_today_mm}mm`, color: COLORS.accent.blue },
+              ].map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, padding: 12, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: item.color, ...SHADOWS.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: COLORS.text.primary, fontSize: 13, fontFamily: "dm-sans-bold" }}>{item.label}</Text>
+                      <Text style={{ color: item.color, fontSize: 11, fontFamily: "dm-sans-bold" }}>{item.value}</Text>
+                    </View>
+                    <Text style={{ color: COLORS.text.muted, fontSize: 11, marginTop: 2 }}>{item.detail}</Text>
+                  </View>
                 </View>
-              </View>
-              <Text className="text-typography-400 text-xs w-8">{day.low}\u00b0</Text>
-              <Text className="text-typography-900 text-xs font-dm-sans-bold w-8">{day.high}\u00b0</Text>
-              {day.rainChance > 20 && (
-                <Text className="text-blue-500 text-xs w-10 text-right">{day.rainChance}%</Text>
+              ))}
+              {insights.frost_risk && (
+                <View style={{ backgroundColor: "#eff6ff", borderRadius: RADIUS.md, padding: 10, marginBottom: 6 }}>
+                  <Text style={{ color: "#1e40af", fontSize: 12, fontFamily: "dm-sans-bold" }}>{"\u2744\ufe0f"} Frost risk in forecast period</Text>
+                </View>
+              )}
+              {insights.heat_stress && (
+                <View style={{ backgroundColor: "#fef2f2", borderRadius: RADIUS.md, padding: 10, marginBottom: 6 }}>
+                  <Text style={{ color: "#991b1b", fontSize: 12, fontFamily: "dm-sans-bold" }}>{"\ud83c\udf21\ufe0f"} Heat stress expected (&gt;42°C)</Text>
+                </View>
               )}
             </View>
-          ))}
-        </View>
+          )}
 
-        {/* Agricultural Weather Impact */}
-        <View className="mt-4 mx-5 bg-green-50 rounded-2xl p-4 border border-green-200">
-          <Text className="text-green-800 font-dm-sans-bold text-base mb-3">
-            {"\ud83c\udf3e"} Agricultural Impact Assessment
-          </Text>
+          {/* 7-Day Forecast */}
+          {daily && (
+            <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontFamily: "dm-sans-bold", marginBottom: 10 }}>7-Day Forecast</Text>
+              {daily.time?.map((dateStr: string, i: number) => {
+                const date = new Date(dateStr);
+                const dayName = i === 0 ? "Today" : dayNames[date.getDay()];
+                const cond = weatherCodeToCondition(daily.weather_code[i]);
+                const hi = Math.round(daily.temperature_max[i]);
+                const lo = Math.round(daily.temperature_min[i]);
+                const rain = daily.precipitation_probability[i];
 
-          {[
-            {
-              title: "Spraying Window",
-              status: "Favorable",
-              detail: "Low wind (< 15 km/h) expected Thu-Fri morning. Ideal for pesticide/foliar spray.",
-              color: "#22c55e",
-              icon: "\u2705",
-            },
-            {
-              title: "Irrigation Advisory",
-              status: "Delay Recommended",
-              detail: "Heavy rain expected Sat-Sun. Postpone irrigation to avoid waterlogging.",
-              color: "#f59e0b",
-              icon: "\u26a0\ufe0f",
-            },
-            {
-              title: "Disease Pressure",
-              status: "High Risk",
-              detail: "Humidity + warmth = high risk for Late Blight (Tomato) and Downy Mildew. Preventive spray recommended.",
-              color: "#ef4444",
-              icon: "\ud83d\udea8",
-            },
-            {
-              title: "Harvest Window",
-              status: "Thu-Fri Optimal",
-              detail: "Dry conditions Thu-Fri ideal for Grape harvest. Avoid Sat-Sun due to rain.",
-              color: "#22c55e",
-              icon: "\ud83c\udf3e",
-            },
-            {
-              title: "Fertilizer Application",
-              status: "Apply Before Sat",
-              detail: "Apply granular fertilizers by Friday. Rain will help dissolution. Avoid foliar application during rain.",
-              color: "#3b82f6",
-              icon: "\ud83d\udca1",
-            },
-          ].map((item, i) => (
-            <View
-              key={i}
-              className="mb-3 rounded-xl p-3"
-              style={{ backgroundColor: item.color + "10", borderLeftWidth: 3, borderLeftColor: item.color }}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  <Text style={{ fontSize: 14 }}>{item.icon}</Text>
-                  <Text className="text-typography-900 font-dm-sans-bold text-sm ml-2">
-                    {item.title}
-                  </Text>
+                return (
+                  <View key={i} style={{ flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 4, ...SHADOWS.sm }}>
+                    <Text style={{ color: COLORS.text.primary, fontSize: 13, fontFamily: "dm-sans-medium", width: 50 }}>{dayName}</Text>
+                    <Text style={{ fontSize: 20, width: 32, textAlign: "center" }}>{cond.icon}</Text>
+                    <View style={{ flex: 1, marginHorizontal: 10 }}>
+                      <View style={{ height: 4, backgroundColor: COLORS.surface.muted, borderRadius: 2, overflow: "hidden", flexDirection: "row" }}>
+                        <View style={{ flex: lo - 10, backgroundColor: "transparent" }} />
+                        <View style={{ flex: hi - lo, backgroundColor: rain > 50 ? COLORS.accent.blue : hi > 35 ? COLORS.status.critical : COLORS.status.moderate, borderRadius: 2 }} />
+                        <View style={{ flex: 45 - hi, backgroundColor: "transparent" }} />
+                      </View>
+                    </View>
+                    <Text style={{ color: COLORS.text.muted, fontSize: 12, width: 28, textAlign: "right" }}>{lo}{"\u00b0"}</Text>
+                    <Text style={{ color: COLORS.text.primary, fontSize: 12, fontFamily: "dm-sans-bold", width: 28, textAlign: "right" }}>{hi}{"\u00b0"}</Text>
+                    {rain > 20 && <Text style={{ color: COLORS.accent.blue, fontSize: 10, width: 30, textAlign: "right" }}>{rain}%</Text>}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Hourly Soil Conditions */}
+          {hourly?.soil_temperature && (
+            <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontFamily: "dm-sans-bold", marginBottom: 10 }}>Soil Conditions (Live)</Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flex: 1, backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, padding: 12, ...SHADOWS.sm }}>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Soil Temp</Text>
+                  <Text style={{ color: COLORS.status.poor, fontSize: 20, fontFamily: "dm-sans-bold" }}>{hourly.soil_temperature[12]?.toFixed(1) || "--"}{"\u00b0"}C</Text>
                 </View>
-                <Text className="text-xs font-dm-sans-bold" style={{ color: item.color }}>
-                  {item.status}
-                </Text>
+                <View style={{ flex: 1, backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, padding: 12, ...SHADOWS.sm }}>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Soil Moisture</Text>
+                  <Text style={{ color: COLORS.accent.blue, fontSize: 20, fontFamily: "dm-sans-bold" }}>{hourly.soil_moisture[12] !== undefined ? (hourly.soil_moisture[12] * 100).toFixed(0) : "--"}%</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, padding: 12, ...SHADOWS.sm }}>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>ET0</Text>
+                  <Text style={{ color: COLORS.status.excellent, fontSize: 20, fontFamily: "dm-sans-bold" }}>{hourly.evapotranspiration[12]?.toFixed(2) || "--"}</Text>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 9 }}>mm/hr</Text>
+                </View>
               </View>
-              <Text className="text-typography-600 text-xs font-dm-sans-regular mt-1 leading-4">
-                {item.detail}
-              </Text>
             </View>
-          ))}
-        </View>
+          )}
 
-        {/* Sun & Moon */}
-        <View className="mt-4 mx-5 bg-background-50 rounded-2xl p-4 border border-outline-100">
-          <Text className="text-typography-900 font-dm-sans-bold text-sm mb-3">
-            Sun & Moon
-          </Text>
-          <View className="flex-row">
-            <View className="flex-1 items-center">
-              <Text style={{ fontSize: 28 }}>{"\ud83c\udf05"}</Text>
-              <Text className="text-typography-800 font-dm-sans-bold text-sm mt-1">6:12 AM</Text>
-              <Text className="text-typography-400 text-xs">Sunrise</Text>
-            </View>
-            <View className="flex-1 items-center">
-              <Text style={{ fontSize: 28 }}>{"\ud83c\udf07"}</Text>
-              <Text className="text-typography-800 font-dm-sans-bold text-sm mt-1">6:48 PM</Text>
-              <Text className="text-typography-400 text-xs">Sunset</Text>
-            </View>
-            <View className="flex-1 items-center">
-              <Text style={{ fontSize: 28 }}>{"\ud83c\udf15"}</Text>
-              <Text className="text-typography-800 font-dm-sans-bold text-sm mt-1">12h 36m</Text>
-              <Text className="text-typography-400 text-xs">Daylight</Text>
-            </View>
-            <View className="flex-1 items-center">
-              <Text style={{ fontSize: 28 }}>{"\ud83c\udf19"}</Text>
-              <Text className="text-typography-800 font-dm-sans-bold text-sm mt-1">Waxing</Text>
-              <Text className="text-typography-400 text-xs">Moon Phase</Text>
-            </View>
+          {/* Coordinates */}
+          <View style={{ marginHorizontal: 16, backgroundColor: COLORS.surface.base, borderRadius: RADIUS.md, padding: 12, ...SHADOWS.sm }}>
+            <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>
+              {"\ud83d\udccd"} {coords.lat.toFixed(4)}{"\u00b0"}N, {coords.lon.toFixed(4)}{"\u00b0"}E | Timezone: {weather?.location?.timezone || "auto"}
+            </Text>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

@@ -297,6 +297,54 @@ class BackendClient {
       { method: "PATCH" }
     );
   }
+
+  // ---- Weather (location-based) ----
+
+  async getWeatherForecast(lat: number, lon: number, days = 7): Promise<any> {
+    return this.request<any>(`/api/v1/weather/forecast?lat=${lat}&lon=${lon}&days=${days}`);
+  }
+
+  async getFieldWeather(fieldId: string, days = 7): Promise<any> {
+    return this.request<any>(`/api/v1/fields/${fieldId}/weather?days=${days}`);
+  }
+
+  async searchLocation(query: string): Promise<any> {
+    return this.request<any>(`/api/v1/weather/search?q=${encodeURIComponent(query)}`);
+  }
+
+  // ---- Sentinel-2 ----
+
+  async getFieldScenes(fieldId: string, daysBack = 60): Promise<any> {
+    return this.request<any>(`/api/v1/fields/${fieldId}/sentinel/scenes?days_back=${daysBack}`);
+  }
+
+  async getFieldIndices(fieldId: string): Promise<any> {
+    return this.request<any>(`/api/v1/fields/${fieldId}/sentinel/indices`);
+  }
+
+  // ---- Soil ----
+
+  async getFieldSoilReport(fieldId: string): Promise<any> {
+    return this.request<any>(`/api/v1/fields/${fieldId}/soil-report`);
+  }
+
+  async getSoilReport(boundary: GeoJSONPolygon, crop?: string): Promise<any> {
+    return this.request<any>("/api/v1/soil-report", {
+      method: "POST",
+      body: JSON.stringify({ boundary, crop }),
+    });
+  }
+
+  async getFieldSoilMoisture(fieldId: string): Promise<any> {
+    return this.request<any>(`/api/v1/fields/${fieldId}/soil-moisture`);
+  }
+
+  async calculateArea(boundary: GeoJSONPolygon): Promise<any> {
+    return this.request<any>("/api/v1/calculate-area", {
+      method: "POST",
+      body: JSON.stringify({ boundary }),
+    });
+  }
 }
 
 // Singleton instance

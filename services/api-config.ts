@@ -31,8 +31,8 @@ export const API_ENDPOINTS = {
 };
 
 // ---- AgriTech Backend (FastAPI + PostGIS) ----
-// Change to your backend URL in production
-export const BACKEND_URL = "http://localhost:8000";
+// AWS EC2 Mumbai production server
+export const BACKEND_URL = "http://13.232.161.89:8000";
 export const BACKEND_API = `${BACKEND_URL}/api/v1`;
 
 // Default farm location (Nashik, Maharashtra)

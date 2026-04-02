@@ -1,9 +1,11 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { fields, getNDVIColor } from "@/data/agritech";
 import { fieldDetails } from "@/data/market";
+import { backendClient } from "@/services/backend-client";
+import { COLORS, RADIUS, SHADOWS } from "@/components/screens/agritech/premium/theme";
 
 type SatLayer = "ndvi" | "moisture" | "temperature" | "lai";
 
