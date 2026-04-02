@@ -1,118 +1,78 @@
-# Welcome to the Weather App Template for `theappmarket.io` 👋
+# AgriTech Platform
 
-This is a template for a weather app that will be made for the `theappmarket.io` platform, created with Expo. It includes basic features for a weather app, such as weather updates, and location-based forecasts.
+Advanced precision agriculture platform using satellite intelligence, AI, and agronomic science. Helps farmers shift from intuition-based to data-driven farming.
 
-## Get started
-
-0. Make sure you have Node.js v22.6.0 or higher installed.
-   used node version : v22.12.0
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-    npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Example Folder structure
-
-Please refer and follow the folder structure below:
+## Architecture
 
 ```
-app/
-	├── (auth)/
-	│   ├── _layout.tsx
-	│   └── onboarding.tsx
-	├── (protected)/
-	├── (root)/
-	│   ├── _layout.tsx
-	│   └── home.tsx
-	├── _layout.tsx
-	├── +not-found.tsx
-	├── index.tsx
-	components/
-	├── ui/
-	│   ├── button/
-	│   │   └── index.tsx
-	│   └── ...
-	├── layouts/
-	│   ├── base/
-	│   │   └── index.tsx
-	│   ├── auth/
-	│   │   └── index.tsx
-	│   └── ...
-	├── shared/
-	│   ├── header/
-	│   │   └── index.tsx
-	│   ├── footer/
-	│   │   └── index.tsx
-	│   └── ...
-	├── screens/
-  │   ├── home/
-  │   │   ├── hero-section/
-  │   │   │   └── index.tsx
-  │   │   ├── feature-grid/
-  │   │   │   └── index.tsx
-  │   │   └── testimonials/
-  │   │       └── index.tsx
-  │   ├── profile/
-  │   │   ├── user-info/
-  │   │   │   └── index.tsx
-  │   │   ├── activity-feed/
-  │   │   │   └── index.tsx
-  │   │   └── settings-form/
-  │   │       └── index.tsx
-  └── ...
-assets/
-  ├── images/                    # Image assets
-  │   ├── common/                # Shared images across the app
-  │   │   ├── logo.png           # Shared logo image
-  │   │   └── icons/             # Shared icons
-  │   │       └── default-avatar.png  # Default avatar icon
-  │   ├── screens/               # Screen-specific images
-  │   │   ├── home/              # Images specific to Home screen
-  │   │   │   └── cover.png      # Home screen cover image
-  │   │   └── profile/           # Images specific to Profile screen
-  │   │       └── background.png # Profile background image
-  │   └── ...                    # Other image assets
-  ├── audio/                     # Audio assets
-  │   ├── asset1.mp3             # Example audio file
-  │   ├── asset2.mp3             # Another audio file
-  │   └── ...                    # Other audio assets
-  ├── video/                     # Video assets
-  │   ├── asset1.mp4             # Example video file
-  │   └── ...                    # Other video assets
-  └── fonts/                     # Font files
-      ├── Roboto/                # Roboto font files
-      │   ├── regular.ttf        # Regular font file
-      │   └── bold.ttf           # Bold font file
-      └── ...                    # Other font files
+┌─────────────────────────────────────────┐
+│  React Native (Expo) - 59 screens       │
+│  Premium UI + GPS mapping + offline     │
+└──────────────┬──────────────────────────┘
+               │ REST + WebSocket
+┌──────────────▼──────────────────────────┐
+│  FastAPI Backend - 50 modules           │
+│  43+ endpoints | JWT | Rate limiting    │
+└──────────────┬──────────────────────────┘
+               │
+    ┌──────────┼──────────┐
+    ▼          ▼          ▼
+ Database   Open-Meteo   NASA MODIS
+            SoilGrids    Sentinel-2
 ```
 
-## Learn more
+## Quick Start
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+# Backend
+cd backend && pip install -r requirements.txt && python run.py
+# http://localhost:8000/docs
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# Frontend
+npm install && npx expo start --web
+# http://localhost:19006
+```
 
-## Join the community
+## Live
 
-Join our community of developers creating universal apps for `theappmarket.io`.
+- **API**: http://13.232.161.89:8000/docs
+- **GitHub**: https://github.com/ifasrinivas/agritech-platform
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 43+ API Endpoints
+
+| Category | Endpoints |
+|----------|-----------|
+| Auth | signup, login, refresh |
+| Fields | CRUD, GPS boundary, quick-add-field |
+| NDVI | trigger, history, ad-hoc analysis |
+| Sentinel-2 | scenes, spectral indices, moisture |
+| Soil | full report (3 sources), moisture |
+| Weather | location forecast, city search |
+| Advisory | crop-specific, growth schedule |
+| Market | APMC prices, sell recommendation |
+| Pest Risk | weather-based prediction |
+| Tools | input cost, profit estimator |
+| Calendar | auto-generated crop schedule |
+| Compare | side-by-side field analysis |
+| Languages | Hindi + Marathi (16 terms) |
+| Irrigation | alerts, resolve |
+
+## Features
+
+- Satellite NDVI crop health monitoring
+- Location-based weather with agricultural insights
+- Soil analysis (pH, NPK, texture, live moisture)
+- Weather-based pest/disease risk prediction
+- Market prices with buy/sell recommendations
+- Input cost calculator + profit estimator
+- Auto-generated crop calendar
+- GPS field boundary mapping
+- Multilingual (English, Hindi, Marathi)
+- Farmer-friendly UI (color-coded, icon-based)
+
+## Stack
+
+**Frontend**: React Native, Expo, NativeWind, Lucide Icons
+**Backend**: Python, FastAPI, SQLAlchemy, Shapely
+**Data**: Open-Meteo, NASA MODIS, Sentinel-2, ISRIC SoilGrids
+**Deploy**: AWS EC2, Docker, GitHub Actions

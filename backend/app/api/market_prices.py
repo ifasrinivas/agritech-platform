@@ -232,7 +232,7 @@ TRANSLATIONS = {
 
 
 @router.get("/translate")
-async def translate_text(text: str = Query(...), lang: str = Query("hi", regex="^(hi|mr)$")):
+async def translate_text(text: str = Query(...), lang: str = Query("hi", pattern="^(hi|mr)$")):
     """Translate common agri terms to Hindi/Marathi."""
     translated = TRANSLATIONS.get(text, {}).get(lang)
     if translated:
