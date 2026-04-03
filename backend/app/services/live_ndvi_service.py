@@ -102,27 +102,28 @@ async def compute_live_ndvi(geojson_polygon: dict, days_back: int = 30) -> dict 
 
 
 async def _read_cog_ndvi(red_href: str, nir_href: str, geojson_polygon: dict) -> dict | None:
-    """Read actual pixel values from COG using rasterio."""
+    """Read actual pixel values from Sentinel-2 COG with CRS transform (WGS84 -> UTM)."""
     try:
         import rasterio
         from rasterio.windows import from_bounds
-        from rasterio.crs import CRS
+        from rasterio.warp import transform_bounds
 
         poly = shape(geojson_polygon)
-        bounds = poly.bounds  # minx, miny, maxx, maxy
+        wgs84_bounds = poly.bounds
 
-        # Read Red band
         with rasterio.open(red_href) as red_ds:
-            # Get window from bounds
-            window = from_bounds(*bounds, transform=red_ds.transform)
+            utm_bounds = transform_bounds("EPSG:4326", red_ds.crs, *wgs84_bounds)
+            window = from_bounds(*utm_bounds, transform=red_ds.transform)
             red = red_ds.read(1, window=window).astype(float)
 
-        # Read NIR band
         with rasterio.open(nir_href) as nir_ds:
-            window = from_bounds(*bounds, transform=nir_ds.transform)
+            utm_bounds = transform_bounds("EPSG:4326", nir_ds.crs, *wgs84_bounds)
+            window = from_bounds(*utm_bounds, transform=nir_ds.transform)
             nir = nir_ds.read(1, window=window).astype(float)
 
-        # Compute NDVI
+        if red.size == 0 or nir.size == 0:
+            return None
+
         valid = (red + nir) > 0
         ndvi = np.where(valid, (nir - red) / (nir + red), np.nan)
         ndvi_valid = ndvi[~np.isnan(ndvi)]
@@ -138,10 +139,10 @@ async def _read_cog_ndvi(red_href: str, nir_href: str, geojson_polygon: dict) ->
             "count": int(len(ndvi_valid)),
         }
     except ImportError:
-        logger.info("rasterio not installed — cannot read COG pixels directly")
+        logger.info("rasterio not installed - cannot read COG pixels")
         return None
     except Exception as e:
-        logger.info(f"rasterio COG read error: {e}")
+        logger.info(f"COG pixel read error: {e}")
         return None
 
 
