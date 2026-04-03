@@ -208,10 +208,13 @@ async def compare_fields(
 
 
 # ========================================
-# 4. MULTILINGUAL ADVISORY
+# 4. MULTILINGUAL ADVISORY (12 languages)
 # ========================================
 
-TRANSLATIONS = {
+from app.data.translations import TRANSLATIONS, SUPPORTED_LANGUAGES, LANGUAGE_CODES
+
+# Legacy dict removed - now imported from app.data.translations
+_OLD_TRANSLATIONS = {
     "Healthy": {"hi": "\u0938\u094d\u0935\u0938\u094d\u0925", "mr": "\u0928\u093f\u0930\u094b\u0917\u0940"},
     "Good": {"hi": "\u0905\u091a\u094d\u091b\u093e", "mr": "\u091a\u093e\u0902\u0917\u0932\u0947"},
     "Watch": {"hi": "\u0938\u093e\u0935\u0927\u093e\u0928", "mr": "\u0932\u0915\u094d\u0937 \u0926\u094d\u092f\u093e"},
@@ -232,19 +235,27 @@ TRANSLATIONS = {
 
 
 @router.get("/translate")
-async def translate_text(text: str = Query(...), lang: str = Query("hi", pattern="^(hi|mr)$")):
-    """Translate common agri terms to Hindi/Marathi."""
+async def translate_text(text: str = Query(...), lang: str = Query("hi")):
+    """Translate agri terms to any of 12 Indian languages."""
+    if lang not in LANGUAGE_CODES:
+        return {"error": f"Unsupported language. Available: {LANGUAGE_CODES}"}
     translated = TRANSLATIONS.get(text, {}).get(lang)
     if translated:
-        return {"original": text, "translated": translated, "language": lang}
+        return {"original": text, "translated": translated, "language": lang, "language_name": SUPPORTED_LANGUAGES.get(lang)}
     return {"original": text, "translated": text, "language": lang, "note": "No translation available"}
+
+
+@router.get("/languages")
+async def list_languages():
+    """List all supported languages."""
+    return {"languages": SUPPORTED_LANGUAGES, "count": len(SUPPORTED_LANGUAGES)}
 
 
 @router.get("/translations/{lang}")
 async def get_all_translations(lang: str):
-    """Get all available translations for a language."""
-    if lang not in ("hi", "mr"):
-        raise HTTPException(400, "Supported languages: hi (Hindi), mr (Marathi)")
+    """Get all available translations for a language (12 Indian languages)."""
+    if lang not in LANGUAGE_CODES:
+        raise HTTPException(400, f"Supported: {list(SUPPORTED_LANGUAGES.values())}")
     result = {}
     for key, trans in TRANSLATIONS.items():
         if lang in trans:

@@ -15,13 +15,13 @@ from app.dependencies import get_db
 from app.models.field import Field
 from app.services.ndvi_pipeline import field_boundary_to_geojson, compute_days_after_sowing
 from app.services import soil_analysis_service
+from app.data.crop_database import CROP_DATABASE, CROP_CATEGORIES, ALL_CROP_NAMES
 
 router = APIRouter(tags=["Farmer Advisory"])
 
 
-# ---- Crop-Specific Recommendations ----
-
-CROP_DATABASE = {
+# Legacy reference kept for backward compat (imports from crop_database.py now)
+_CROP_DATABASE = {
     "Wheat": {
         "ideal_pH": (6.0, 7.5), "ideal_temp": (15, 25), "water_need": "moderate",
         "npk_ratio": "120:60:40 kg/ha", "sowing_window": "Oct 25 - Nov 20",
@@ -264,6 +264,172 @@ async def get_crop_guide(crop_name: str):
     """Get complete growing guide for a crop."""
     crop = CROP_DATABASE.get(crop_name)
     if not crop:
-        available = list(CROP_DATABASE.keys())
+        available = ALL_CROP_NAMES
         raise HTTPException(404, f"Crop '{crop_name}' not found. Available: {available}")
     return {"crop": crop_name, **crop}
+
+
+@router.get("/crops/all")
+async def list_all_crops():
+    """List all available crops grouped by category."""
+    crops = []
+    for name, data in CROP_DATABASE.items():
+        crops.append({
+            "name": name,
+            "category": data.get("category", "other"),
+            "hindi_name": data.get("hindi_name", ""),
+            "telugu_name": data.get("telugu_name", ""),
+            "kannada_name": data.get("kannada_name", ""),
+            "tamil_name": data.get("tamil_name", ""),
+            "duration": data.get("duration", ""),
+            "water_need": data.get("water_need", ""),
+            "ideal_temp": data.get("ideal_temp"),
+        })
+    return {
+        "total": len(crops),
+        "categories": CROP_CATEGORIES,
+        "crops": crops,
+    }
+
+
+@router.get("/satellite-explainer/{field_id}")
+async def satellite_explainer(field_id: uuid.UUID, lang: str = "en", db: AsyncSession = Depends(get_db)):
+    """Explain satellite NDVI in farmer-friendly language."""
+    field = await db.get(Field, field_id)
+    if not field:
+        raise HTTPException(404, "Field not found")
+
+    # Get live NDVI
+    geojson = field_boundary_to_geojson(field.boundary)
+    from app.services import live_ndvi_service
+    ndvi_data = await live_ndvi_service.compute_live_ndvi(geojson)
+    ndvi_val = ndvi_data.get("ndvi_mean", 0.5) if ndvi_data else 0.5
+
+    # Map NDVI to farmer explanation
+    from app.data.translations import TRANSLATIONS
+    scale = [
+        {"range": "0.0-0.2", "color": "red", "emoji": "X", "label": "Bare soil / Dead crop",
+         "meaning_en": "No crop visible. Field is bare or crop has died.",
+         "action": "Re-sow or investigate cause (drought, pest, disease)"},
+        {"range": "0.2-0.4", "color": "orange", "emoji": "!", "label": "Very stressed / Weak",
+         "meaning_en": "Crop is severely stressed. Growth is very poor.",
+         "action": "Urgent: Check water, pests, disease. Apply emergency measures."},
+        {"range": "0.4-0.6", "color": "yellow", "emoji": "?", "label": "Moderate / Needs care",
+         "meaning_en": "Crop is growing but below expected. Some stress visible.",
+         "action": "Investigate: Check soil moisture, nutrient deficiency, or pest damage."},
+        {"range": "0.6-0.8", "color": "green", "emoji": "OK", "label": "Healthy / Good growth",
+         "meaning_en": "Your crop is healthy and growing well!",
+         "action": "Continue current care. Monitor regularly."},
+        {"range": "0.8-1.0", "color": "darkgreen", "emoji": "++", "label": "Very healthy / Dense",
+         "meaning_en": "Excellent! Your crop is in peak health.",
+         "action": "Maintain practices. Prepare for harvest if near maturity."},
+    ]
+
+    # Find current level
+    if ndvi_val < 0.2:
+        level = 0
+    elif ndvi_val < 0.4:
+        level = 1
+    elif ndvi_val < 0.6:
+        level = 2
+    elif ndvi_val < 0.8:
+        level = 3
+    else:
+        level = 4
+
+    current = scale[level]
+
+    # Get translation
+    meaning_key = "Your crop is healthy" if level >= 3 else "Your crop needs attention" if level >= 2 else "Your crop is in danger"
+    translated = TRANSLATIONS.get(meaning_key, {}).get(lang, current["meaning_en"])
+
+    return {
+        "field_id": str(field_id),
+        "field_name": field.name,
+        "crop": field.crop,
+        "ndvi_value": ndvi_val,
+        "satellite_date": ndvi_data.get("satellite_date") if ndvi_data else None,
+        "source": ndvi_data.get("source") if ndvi_data else None,
+        "current_level": current,
+        "translated_meaning": translated,
+        "language": lang,
+        "full_scale": scale,
+        "pixel_count": ndvi_data.get("pixel_count") if ndvi_data else None,
+    }
+
+
+@router.get("/today-actions/{field_id}")
+async def get_today_actions(field_id: uuid.UUID, lang: str = "en", db: AsyncSession = Depends(get_db)):
+    """Get max 3 priority actions for today (simplified for farmers)."""
+    field = await db.get(Field, field_id)
+    if not field:
+        raise HTTPException(404, "Field not found")
+
+    das = compute_days_after_sowing(field.sowing_date)
+    crop_info = CROP_DATABASE.get(field.crop, {})
+    actions = []
+
+    # 1. Check growth stage action
+    if das is not None and crop_info.get("key_stages"):
+        for stage in crop_info["key_stages"]:
+            das_range = stage["das"].split("-")
+            start = int(das_range[0])
+            end = int(das_range[-1]) if len(das_range) > 1 else start + 10
+            if start <= das <= end:
+                actions.append({
+                    "priority": 1, "icon": "plant", "color": "green",
+                    "title": f"{stage['stage']} Stage",
+                    "detail": stage["action"],
+                })
+                break
+
+    # 2. Check weather for spray window
+    geojson = field_boundary_to_geojson(field.boundary)
+    from shapely.geometry import shape
+    centroid = shape(geojson).centroid
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get("https://api.open-meteo.com/v1/forecast", params={
+                "latitude": centroid.y, "longitude": centroid.x,
+                "current": "wind_speed_10m,precipitation,temperature_2m",
+                "forecast_days": 1, "timezone": "auto",
+            })
+            if r.status_code == 200:
+                wx = r.json().get("current", {})
+                wind = wx.get("wind_speed_10m", 10)
+                rain = wx.get("precipitation", 0)
+                temp = wx.get("temperature_2m", 25)
+                if wind > 15 or rain > 1:
+                    actions.append({
+                        "priority": 2, "icon": "wind", "color": "red",
+                        "title": "No Spray Today",
+                        "detail": f"Wind {wind:.0f}km/h" if wind > 15 else f"Rain {rain}mm",
+                    })
+                elif temp > 38:
+                    actions.append({
+                        "priority": 2, "icon": "hot", "color": "red",
+                        "title": "Too Hot - Water Crops",
+                        "detail": f"Temperature {temp:.0f}C. Irrigate in evening.",
+                    })
+                else:
+                    actions.append({
+                        "priority": 3, "icon": "spray", "color": "green",
+                        "title": "Spray Window OK",
+                        "detail": f"Wind {wind:.0f}km/h, no rain. Good for spraying.",
+                    })
+    except:
+        pass
+
+    # 3. Market recommendation
+    from app.api.market_prices import MANDI_PRICES
+    market = MANDI_PRICES.get(field.crop)
+    if market and market.get("recommendation") == "sell":
+        actions.append({
+            "priority": 2, "icon": "sell", "color": "green",
+            "title": f"Sell {field.crop} - Price Up",
+            "detail": f"Rs.{market['varieties'][0]['modal']}/qtl ({market['trend']} {market['change_pct']}%)",
+        })
+
+    # Sort by priority, limit 3
+    actions.sort(key=lambda a: a["priority"])
+    return {"field_id": str(field_id), "crop": field.crop, "day": das, "actions": actions[:3]}
